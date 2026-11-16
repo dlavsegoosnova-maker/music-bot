@@ -24,7 +24,7 @@ async def search_music(message: types.Message):
     msg = await message.answer("🔎 Ищу треки...")
 
     ydl_opts = {
-        'quiet': True,
+        'quiet': False,
         'extract_flat': True,
         'default_search': 'ytsearch15',
     }
@@ -40,7 +40,7 @@ async def search_music(message: types.Message):
                 entries = [info]
 
         if not entries:
-            await msg.edit_text("Ничего не найдено 😔. Попробуй другое название.")
+            await msg.edit_text("❌ Поиск вернул пустой результат. Возможно, YouTube блокирует запросы с этого сервера.")
             return
 
         user_id = message.from_user.id
@@ -54,14 +54,14 @@ async def search_music(message: types.Message):
             buttons.append([types.InlineKeyboardButton(text=title, callback_data=f"dl_{idx}")])
 
         if not buttons:
-            await msg.edit_text("Ничего не найдено 😔")
+            await msg.edit_text("❌ Не удалось сформировать кнопки.")
             return
 
         keyboard = types.InlineKeyboardMarkup(inline_keyboard=buttons)
         await msg.edit_text(f"🎵 Результаты по запросу:\n*{query}*", reply_markup=keyboard, parse_mode="Markdown")
 
     except Exception as e:
-        await msg.edit_text(f"Ошибка поиска: {str(e)[:80]}")
+        await msg.edit_text(f"⚠️ Ошибка: {str(e)}")
         logging.error(e)
 
 @dp.callback_query(F.data.startswith("dl_"))
