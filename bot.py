@@ -27,6 +27,7 @@ async def search_music(message: types.Message):
         'quiet': False,
         'extract_flat': True,
         'default_search': 'ytsearch15',
+        'extractor_args': {'youtube': {'player_client': ['android', 'web']}},
     }
 
     try:
@@ -40,7 +41,7 @@ async def search_music(message: types.Message):
                 entries = [info]
 
         if not entries:
-            await msg.edit_text("❌ Поиск вернул пустой результат. Возможно, YouTube блокирует запросы с этого сервера.")
+            await msg.edit_text("❌ Поиск вернул пустой результат.")
             return
 
         user_id = message.from_user.id
@@ -88,7 +89,8 @@ async def download_track(callback: types.CallbackQuery):
             'preferredcodec': 'mp3',
             'preferredquality': '192',
         }],
-        'quiet': True
+        'quiet': True,
+        'extractor_args': {'youtube': {'player_client': ['android', 'web']}},
     }
 
     try:
