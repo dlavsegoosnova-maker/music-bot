@@ -25,7 +25,7 @@ async def search_music(message: types.Message):
     ydl_opts = {
         'quiet': True,
         'extract_flat': True,
-        'default_search': 'auto', # Ищем 5 вариантов
+        'default_search': 'ytsearch15', # Ищем 5 вариантов
     }
 
     try:
