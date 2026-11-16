@@ -1,11 +1,12 @@
+import asyncio
 import os
 import logging
 from aiogram import Bot, Dispatcher, types, F
 from aiogram.filters import Command
 from yt_dlp import YoutubeDL
 
-# Токен берется из настроек окружения или вставляется сюда
-TOKEN = os.getenv("BOT_TOKEN", "9081136516:AAEPLoKpm15KgA7KXw7GT5TlLNRVBxyIapA")
+# Токен берется из переменных окружения
+TOKEN = os.getenv("BOT_TOKEN")
 
 logging.basicConfig(level=logging.INFO)
 bot = Bot(token=TOKEN)
@@ -15,26 +16,31 @@ search_results = {}
 
 @dp.message(Command("start"))
 async def cmd_start(message: types.Message):
-    await message.answer("Привет. Напиши название песни.")
+    await message.answer("Привет! Напиши название песни или исполнителя, и я найду её.")
 
 @dp.message(F.text)
 async def search_music(message: types.Message):
     query = message.text
-    msg = await message.answer("🔎 Ищу...")
+    msg = await message.answer("🔎 Ищу треки...")
 
     ydl_opts = {
         'quiet': True,
         'extract_flat': True,
-        'default_search': 'ytsearch15', # Ищем 5 вариантов
+        'default_search': 'ytsearch15',
     }
 
     try:
         with YoutubeDL(ydl_opts) as ydl:
             info = ydl.extract_info(query, download=False)
-            entries = info.get('entries', [])
+            
+            entries = []
+            if 'entries' in info:
+                entries = info['entries']
+            elif 'id' in info:
+                entries = [info]
 
         if not entries:
-            await msg.edit_text("Ничего не найдено 😔")
+            await msg.edit_text("Ничего не найдено 😔. Попробуй другое название.")
             return
 
         user_id = message.from_user.id
@@ -42,14 +48,21 @@ async def search_music(message: types.Message):
 
         buttons = []
         for idx, entry in enumerate(entries):
+            if not entry:
+                continue
             title = entry.get('title', 'Без названия')[:40]
             buttons.append([types.InlineKeyboardButton(text=title, callback_data=f"dl_{idx}")])
 
+        if not buttons:
+            await msg.edit_text("Ничего не найдено 😔")
+            return
+
         keyboard = types.InlineKeyboardMarkup(inline_keyboard=buttons)
-        await msg.edit_text(f"🎵 Результаты для: *{query}*", reply_markup=keyboard, parse_mode="Markdown")
+        await msg.edit_text(f"🎵 Результаты по запросу:\n*{query}*", reply_markup=keyboard, parse_mode="Markdown")
 
     except Exception as e:
-        await msg.edit_text("Ошибка поиска.")
+        await msg.edit_text(f"Ошибка поиска: {str(e)[:80]}")
+        logging.error(e)
 
 @dp.callback_query(F.data.startswith("dl_"))
 async def download_track(callback: types.CallbackQuery):
@@ -57,13 +70,13 @@ async def download_track(callback: types.CallbackQuery):
     user_id = callback.from_user.id
 
     if user_id not in search_results or idx >= len(search_results[user_id]):
-        await callback.answer("Кнопка устарела!", show_alert=True)
+        await callback.answer("Кнопка устарела, поищи заново!", show_alert=True)
         return
 
     track_info = search_results[user_id][idx]
     video_url = track_info.get('url') or f"https://www.youtube.com/watch?v={track_info.get('id')}"
     
-    await callback.answer("⏳ Скачиваю...")
+    await callback.answer("⏳ Скачиваю трек, подожди пару секунд...")
     status_msg = await callback.message.answer("⬇️ Загружаю аудио...")
 
     filename = f"track_{user_id}_{idx}"
@@ -73,7 +86,7 @@ async def download_track(callback: types.CallbackQuery):
         'postprocessors': [{
             'key': 'FFmpegExtractAudio',
             'preferredcodec': 'mp3',
-            'preferredquality': '128',
+            'preferredquality': '192',
         }],
         'quiet': True
     }
@@ -92,8 +105,11 @@ async def download_track(callback: types.CallbackQuery):
             os.remove(mp3_file)
 
     except Exception as e:
-        await status_msg.edit_text("Не удалось скачать трек.")
+        await status_msg.edit_text("Не удалось скачать этот трек 😔")
+        logging.error(e)
+
+async def main():
+    await dp.start_polling(bot)
 
 if __name__ == "__main__":
-    import asyncio
-    asyncio.run(dp.start_polling(bot))
+    asyncio.run(main())
